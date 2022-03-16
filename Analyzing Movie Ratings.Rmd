@@ -1,0 +1,284 @@
+---
+title: "Analyzing Movie Ratings"
+author: "Sofiane Ikkour"
+output: html_document
+---
+
+#### **Context:**  
+This project is about web scraping in which we'll perform practical web data extraction in order to analyze movie ratings. The web page we'll use is [IMDB](https://www.imdb.com/). IMDB is the world's most popular source for movie, TV, and celebrity content.  
+
+#### **Objective:** 
+The goal is to extract data from the top 30 movies between [March and July 2020](http://dataquestio.github.io/web-scraping-pages/IMDb-DQgp.html). We can extract various details, including a movie's title, description actors, director, genre, runtime, and ratings. Then, we'll investigate the correlation between ratings and user votes.
+
+
+**Note:** This code was written on RStudio.  
+**Language:** R.  
+**Packages:** rvest, dplyr, ggplot2, readr, stringr.  
+
+First of all, let's take a look at the page we'll work with which is illustrated below:
+
+![IMDB](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/IMDB.JPG)
+
+**Load the relevant libraries and web page**
+
+Let's load the web page and the necessary packages.
+
+```{r}
+# load the relevant libraries
+library(rvest)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(stringr)
+
+# assign the URL to a variable named url
+url <- "http://dataquestio.github.io/web-scraping-pages/IMDb-DQgp.html"
+
+# load the web page content
+wp_content <- read_html(url)
+```
+
+**Analysis and discussion**
+
+By looking at the web page, we can make two remarks:
+
+1. The blocks from one movie to another are similar so they probably use the same selectors.  
+Here's the first block: the one from *Mulan*. The elements we want to extract are highlighted in red:
+
+![Mulan](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/Mulan.png)
+
+
+
+2. There are some missing values. The ratings and user votes are missing in some movies.
+
+![A quiet place](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/A quiet place.png)
+
+
+
+The Browser Developer Tools is used to access the page's code. Here's an HTML snippet code which identifies the block:
+
+![Snippet Code Mulan](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/Snippet Code Mulan.JPG)
+
+**Extract data**
+
+The next step consists in browsing the code to find the selectors of the elements. We'll then check how many elements we can successfully capture with a selector and extract the expected data from the page.  
+
+First we need to extract the movie's titles and the release years.
+
+![Title](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/Title.png)
+
+
+```{r}
+# find the CSS selector for the movies' titles and assign the result to a variable
+selector_1 <- ".lister-item-header a"
+
+# extract the movies' titles
+titles <- wp_content %>%
+  html_nodes(selector_1) %>%
+  html_text()
+
+# print the titles vector
+print(titles)
+```
+
+```{r}
+# find the CSS selector for the release years and assign the result to a variable
+selector_2 <- ".text-muted.unbold"
+
+# extract the movies' years
+release_years <- wp_content %>%
+  html_nodes(selector_2) %>%
+  html_text()
+
+# convert the values from character to numeric data type
+release_years <- parse_number(release_years)
+
+# print the release_years vector
+release_years
+```
+
+We want now to extract the movies' runtimes and genres.
+
+![Runtimes_genre](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/runtimes_genre.png)
+
+
+```{r}
+# find the runtime CSS selector and assign the result to a variable
+selector_3 <- ".runtime"
+
+# extract the movies' runtimes
+runtimes <- wp_content %>%
+  html_nodes(selector_3) %>%
+  html_text()
+
+# convert the values from character to numeric data type
+runtimes <- parse_number(runtimes)
+
+# print the runtimes vector
+print(runtimes)
+```
+
+```{r}
+# find the movies' genres CSS selector and assign the result to a variable
+selector_4 <- ".genre"
+
+# extract the movies' genres
+genres <- wp_content %>%
+  html_nodes(selector_4) %>%
+  html_text()
+
+# print the genres vector
+print(genres)
+```
+
+```{r}
+# the genre characters have whitespaces at the end, we need to remove them
+genres <- str_trim(string = genres, side = "right")
+
+# print the genres vector
+print(genres)
+```
+
+Now we'll extract the user ratings and metascores.
+
+![Ratings_Metascore](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/Ratings_Metascore.png)
+
+```{r}
+# find the user ratings CSS selector and assign the result to a variable
+selector_5 <- ".ratings-imdb-rating"
+
+# extract the movies' user ratings
+ratings <- wp_content %>%
+  html_nodes(selector_5) %>%
+  html_attr("data-value")
+
+# convert the values from character to numeric data type
+ratings <- as.numeric(ratings)
+
+# print the ratings vector
+print(ratings)
+```
+
+```{r}
+# find the metascore CSS selector and assign the result to a variable
+selector_6 <- ".metascore"
+
+# extract the movie metascore
+metascore <- wp_content %>%
+  html_nodes(selector_6) %>%
+  html_text()
+
+# print the metascore vector
+print(metascore)
+```
+
+```{r}
+# remove the whitespaces at the end of each character
+metascore <- str_trim(string = metascore, side = "right")
+
+# convert from character to numeric data type
+metascore <- as.numeric(metascore)
+
+# print the metascore vector
+print(metascore)
+```
+
+Finally, we extract the votes.
+
+![Votes](/Users/Aylan/Documents/IT/DataQuest/R/Analyzing Movie Ratings/Votes.png)
+
+```{r}
+# find the votes CSS selector and assign the result to a variable
+selector_7 <- ".text-muted+ span"
+
+# extract the votes
+votes <- wp_content %>%
+  html_nodes(selector_7) %>%
+  html_text()
+
+# convert the values from character to numeric data type
+votes <- parse_number(votes)
+
+# print the votes vector
+print(votes)
+```
+
+**Combine the extracted data**
+
+Our task now is to combine the extracted data into a tibble.   
+Exploring the web page again, we notice that 17th movie is missing some data. In addition, movies 2, 3, 4, 17, and 29 don't have metascores.   
+There are two options to solve this problem. The fiest option is to intriduce NA values as missing values and deal with them later if necessary. The second option is to remove missing positions from other vectors to vectors of the same length.  
+In this case, we'll introduce NA values in the metascore vector, and remove the 17th element from all the vectors with a length of 30.  
+A function is created to order to insert NA values.
+
+```{r}
+# create a function named append_vector() capable of inserting NA values
+append_vector <- function(vector, indices, values) {
+  
+  ## Creating the current indices of the vector
+  vector_current_indices <- 1:length(vector)
+
+  ## Adding small amount of values (between 0 and 0.9) to the `indices`
+  new_indices <- indices + seq(0, 0.9, length.out = length(indices))
+
+  ## Appending the `new_indices` to the current vector indices
+  f_indices <- c(vector_current_indices, new_indices)
+
+  ## Ordering the indices
+  ordered_indices <- order(f_indices)
+
+  ## Appending the new value to the existing vector
+  new_vector <- c(vector, values)
+
+  ## Ordering the new vector wrt the ordered indices
+  new_vector[ordered_indices]
+}
+
+# use the function to insert NA values into the metascore vector
+# the NA values must be inserted after the positions 1, 1, 1, &3, and 24
+metascore <- append_vector(metascore, c(1, 1, 1, 3, 24), NA)
+
+# remove the 17th element from the vector titles
+titles <- titles[-17]
+
+# remove the 17th element from the vector release_years
+release_years <- release_years[-17]
+
+# remove the 17th element from the vector runtimes
+runtimes <- runtimes[-17]
+
+# remove the 17th element from the vector genres
+genres <- genres[-17]
+
+# remove the 17th element from the vector metascore
+metascore <- metascore[-17]
+```
+
+```{r}
+# create a dataframe with the extracted data
+df <- tibble(titles, release_years, runtimes, genres, ratings, votes, metascore)
+
+# keep only integers for each vector using the floor() function
+# df$titles <- floor(df$titles)
+df <- df %>%
+  mutate(release_years = floor(release_years)) %>%
+  mutate(runtimes = floor(runtimes)) %>%
+  mutate(ratings = floor(ratings)) %>%
+  mutate(votes = floor(votes)) %>%
+  mutate(metascore = floor(metascore))
+
+# create a boxplot that shows the number of votes against the user ratings
+ggplot(df, aes(x = ratings, y = votes, group = ratings)) +
+  geom_boxplot() +
+  labs(
+    title = "The number of votes against the user ratings",
+    x = "User ratings",
+    y = "Number of votes"
+  )
+```
+
+**Observations:**  
+- We can see that the lowest and highest user ratings have the lowest and highest number of votes respectively.  
+- There is also a linear correlation between the ratings and votes on average.
+
+
